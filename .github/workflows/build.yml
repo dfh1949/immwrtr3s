@@ -1,0 +1,257 @@
+name: NanoPi R3S 固件编译
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nanopi-r3s
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 编译 ImmortalWrt R3S
+    runs-on: ubuntu-26.04-arm
+
+    env:
+      TZ: Asia/Shanghai
+      FORCE_UNSAFE_CONFIGURE: 1
+      CCACHE_DISABLE: 1
+
+    steps:
+
+      - name: 检出当前仓库
+        uses: actions/checkout@v5
+
+      - name: 释放磁盘空间
+        shell: bash
+        run: |
+          set -eux
+
+          df -h
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/local/share/powershell
+
+          sudo apt-get clean
+
+          docker system prune -af || true
+
+          rm -rf ~/.cache
+          rm -rf ~/.ccache
+
+          df -h
+
+      - name: 拉取 ImmortalWrt Master
+        shell: bash
+        run: |
+          set -eux
+
+          git clone \
+            --depth=1 \
+            https://github.com/immortalwrt/immortalwrt.git \
+            source
+
+      - name: 安装依赖
+        working-directory: source
+        shell: bash
+        run: |
+          set -eux
+
+          sudo apt update
+
+          sudo apt install -y \
+            ack \
+            antlr3 \
+            asciidoc \
+            autoconf \
+            automake \
+            autopoint \
+            build-essential \
+            bzip2 \
+            ccache \
+            cmake \
+            curl \
+            device-tree-compiler \
+            flex \
+            gawk \
+            gettext \
+            gcc-multilib \
+            g++-multilib \
+            git \
+            gperf \
+            haveged \
+            help2man \
+            intltool \
+            libelf-dev \
+            libglib2.0-dev \
+            libgmp3-dev \
+            libltdl-dev \
+            libmpc-dev \
+            libmpfr-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libpython3-dev \
+            libreadline-dev \
+            libssl-dev \
+            libtool \
+            lrzsz \
+            mkisofs \
+            msmtp \
+            nano \
+            ninja-build \
+            p7zip \
+            patch \
+            pkgconf \
+            python3 \
+            python3-pip \
+            qemu-utils \
+            rsync \
+            scons \
+            squashfs-tools \
+            subversion \
+            swig \
+            texinfo \
+            uglifyjs \
+            unzip \
+            upx-ucl \
+            vim \
+            wget \
+            xmlto \
+            xxd \
+            zlib1g-dev
+
+      - name: 更新 Feeds
+        working-directory: source
+        shell: bash
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: 注入配置
+        shell: bash
+        run: |
+          set -eux
+
+          cp configs/diffconfig source/.config
+
+          cd source
+
+          make defconfig
+
+          KERNEL_CFG=$(find target/linux/rockchip/armv8 \
+            -maxdepth 1 \
+            -type f \
+            -name "config-*" \
+            | sort -V \
+            | tail -n1)
+
+          echo "Kernel Config => $KERNEL_CFG"
+
+          cp \
+            ../configs/config-6.18 \
+            "$KERNEL_CFG"
+
+      - name: 下载源码
+        working-directory: source
+        shell: bash
+        run: |
+          set -eux
+
+          make download -j$(nproc)
+
+          find dl -size -1024c -delete
+
+          make download -j$(nproc)
+
+      - name: 显示编译信息
+        working-directory: source
+        shell: bash
+        run: |
+          echo "CPU:"
+          nproc
+
+          echo "MEM:"
+          free -h
+
+          echo "DISK:"
+          df -h
+
+      - name: 编译固件
+        working-directory: source
+        shell: bash
+        run: |
+          set -eux
+
+          export CCACHE_DISABLE=1
+
+          make -j$(nproc) V=s
+
+      - name: 整理固件
+        if: success()
+        shell: bash
+        run: |
+          set -eux
+
+          mkdir -p release
+
+          cp source/.config release/build.config
+
+          find source/bin/targets/rockchip/armv8 \
+            -type f \
+            \( \
+              -name "*nanopi-r3s*" \
+              -o -name "*.buildinfo" \
+              -o -name "*.json" \
+              -o -name "sha256sums" \
+            \) \
+            -exec cp {} release/ \;
+
+          cd release
+
+          sha256sum * > SHA256SUMS
+
+      - name: 上传固件
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: immortalwrt-r3s
+          path: release
+
+      - name: 上传失败日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            source/.config
+            source/bin
+            source/tmp
+            source/logs
+
+      - name: 发布 Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: r3s-${{ github.run_number }}
+          name: |
+            ImmortalWrt Master NanoPi R3S Build-${{ github.run_number }}
+          files: release/*
+          body: |
+            ### 编译信息
+
+            - Target: rockchip/armv8
+            - Device: NanoPi R3S
+            - Source: ImmortalWrt Master
+            - Runner: ubuntu-26.04-arm
+            - Workflow: GitHub Actions
+
+            ### 配置来源
+
+            - configs/diffconfig
+            - configs/config-6.18
