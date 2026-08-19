@@ -1,27 +1,27 @@
 name: 构建 OpenWrt 固件
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
     inputs:
       confirm:
         description: '⚠️ 请确认是否开始构建（输入 yes 以继续）'
         required: true
         default: 'no'
-  watch:  # 当有人 star 仓库时触发
+  watch:
     types: [started]
 
 env:
   BUILD_DIR: /home/runner/build
   TOOLCHAIN_DIR: /home/runner/build/tools
   OPENWRT_DIR: /home/runner/build/op
-  DIFFCONFIG: diffconfig   # 需放在仓库根目录
+  DIFFCONFIG: diffconfig
 
 jobs:
   build:
     name: 编译
-    runs-on: ubuntu-26.04   # 保持您指定的镜像
-    # 修正：用 ${{ }} 包裹条件表达式
+    runs-on: ubuntu-26.04
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'watch' && github.actor == github.repository_owner) }}
+
     steps:
       - name: 检查确认输入（仅手动触发时需要）
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'yes'
@@ -40,16 +40,11 @@ jobs:
         run: |
           echo "== 清理前磁盘使用情况 =="
           df -h
-          # 创建黑洞目录（内存中操作，极快）
-           mkdir /tmp/empty
-          # 并行发起 3 个 rsync 任务，同时清空三个目录
-          # --delete 会让目标目录完全等于空目录
+          mkdir /tmp/empty
           sudo rsync -a --delete /tmp/empty/ /opt/ghc/ &
           sudo rsync -a --delete /tmp/empty/ /usr/local/lib/android/ &
           sudo rsync -a --delete /tmp/empty/ /usr/share/dotnet/ &
-          # 等待所有后台任务完成
           wait
-          # 最后瞬间删掉三个空壳子
           sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
           echo "== 清理后磁盘使用情况 =="
           df -h
@@ -79,17 +74,12 @@ jobs:
       - name: 下载并解压官方工具链
         run: |
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
-##          curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
+          # curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
           xh -d "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.zst
-          
           [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链下载失败"; exit 1; }
-          
-          # 解压到临时目录
           rm -rf /home/runner/build/toolchain-extract
           mkdir -p /home/runner/build/toolchain-extract
           tar -xf /tmp/toolchain.tar.zst -C /home/runner/build/toolchain-extract
-          
-          # 获取解压后的顶层目录（tar包通常只解压出一个目录）
           EXTRACT_DIR=/home/runner/build/toolchain-extract
           TOOLCHAIN_TOP=$(find "$EXTRACT_DIR" -mindepth 1 -maxdepth 1 -type d | head -n1)
           if [ -z "$TOOLCHAIN_TOP" ]; then
@@ -97,24 +87,16 @@ jobs:
             exit 1
           fi
           echo "顶层目录: $TOOLCHAIN_TOP"
-          
-          # 查找包含 bin 子目录的目录（真正的工具链根）
           TOOLCHAIN_REAL=$(find "$TOOLCHAIN_TOP" -maxdepth 2 -type d -name bin -printf "%h\n" | head -n1)
           if [ -z "$TOOLCHAIN_REAL" ]; then
             echo "❌ 未找到包含 bin 的工具链目录"
             exit 1
           fi
           echo "真正的工具链目录: $TOOLCHAIN_REAL"
-          
-          # 移动真正的工具链目录到目标位置
           rm -rf ${{ env.TOOLCHAIN_DIR }}
           mv "$TOOLCHAIN_REAL" ${{ env.TOOLCHAIN_DIR }}
-          
-          # 清理临时文件
           rm -rf "$EXTRACT_DIR"
           rm -f /tmp/toolchain.tar.zst
-          
-          # 验证编译器存在
           echo "== 工具链 bin 目录内容 =="
           ls ${{ env.TOOLCHAIN_DIR }}/bin | head -20
           ls ${{ env.TOOLCHAIN_DIR }}/bin/*gcc* || { echo "❌ 未找到交叉编译器"; exit 1; }
@@ -138,15 +120,15 @@ jobs:
           cat diffconfig > .config
           ./scripts/ext-toolchain.sh \
             --toolchain ${{ env.TOOLCHAIN_DIR }} \
-            --overwrite-config --config rockchip/armv8 
+            --overwrite-config --config rockchip/armv8
 
       - name: 替换为 ImmortalWrt 的 feeds 配置
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-##          curl -fL --retry 3 -o feeds.conf.default \
-##            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
-##          [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 下载失败"; exit 1; }
+          # curl -fL --retry 3 -o feeds.conf.default \
+          #   https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          # [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 下载失败"; exit 1; }
           xh -d https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
           ls feeds.conf.default
 
@@ -160,7 +142,6 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           make defconfig
-          # 保存最终配置便于调试
           cp .config ${{ github.workspace }}/config.debug
 
       - name: 下载所有源码包
