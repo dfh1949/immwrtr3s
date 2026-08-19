@@ -1,0 +1,98 @@
+name: 构建 OpenWrt 固件
+
+on:
+  workflow_dispatch:
+
+env:
+  BUILD_DIR: /home/build
+  TOOLCHAIN_DIR: /home/build/tools
+  OPENWRT_DIR: /home/build/op
+  DIFFCONFIG: diffconfig
+
+jobs:
+  编译:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装系统依赖（含 xh via snap）
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            bzip2 g++ gawk gcc git glibc-source libncurses-dev make \
+            wget unzip
+          # 通过 snap 安装 xh（避免手动下载二进制）
+          sudo snap install xh
+          xh --version
+
+      - name: 创建工作目录
+        run: |
+          mkdir -p ${{ env.BUILD_DIR }}
+          mkdir -p ${{ env.TOOLCHAIN_DIR }}
+          mkdir -p ${{ env.OPENWRT_DIR }}
+
+      - name: 下载并解压官方工具链（使用 xh）
+        run: |
+          TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
+          xh -d "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.zst
+          tar -xf /tmp/toolchain.tar.zst -C ${{ env.BUILD_DIR }}
+          mv ${{ env.BUILD_DIR }}/openwrt-toolchain-* ${{ env.TOOLCHAIN_DIR }}
+          rm -f /tmp/toolchain.tar.zst
+
+      - name: 克隆 OpenWrt 主线源码
+        run: |
+          git clone -b main --single-branch --depth=1 \
+            https://github.com/openwrt/openwrt.git ${{ env.OPENWRT_DIR }}
+
+      - name: 复制 diffconfig 配置文件
+        run: |
+          cp ${{ github.workspace }}/${{ env.DIFFCONFIG }} ${{ env.OPENWRT_DIR }}/
+
+      - name: 配置外部工具链
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          cat diffconfig > .config
+          ./scripts/ext-toolchain.sh --toolchain ${{ env.TOOLCHAIN_DIR }} --config rockchip/armv8
+
+      - name: 替换为 ImmortalWrt 的 feeds 配置
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          rm -f feeds.conf.default
+          # 此处仍使用 wget（也可改用 xh，但无强制要求）
+          wget -O feeds.conf.default \
+            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+
+      - name: 更新并安装 feeds
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: 执行 defconfig
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: make defconfig
+
+      - name: 下载所有源码包
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          make download -j8 V=s
+        env:
+          FORCE_UNSAFE_CONFIGURE: 1
+
+      - name: 编译固件
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          make -j$(nproc) V=s 2>&1
+        env:
+          FORCE_UNSAFE_CONFIGURE: 1
+
+      - name: 上传固件产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-rockchip-armv8-固件
+          path: |
+            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img.gz
+            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.tar.gz
+          retention-days: 7
+          if-no-files-found: error
