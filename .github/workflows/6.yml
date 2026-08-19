@@ -37,15 +37,19 @@ jobs:
           echo "⏰ 触发时间: $(date)"
 
       - name: 清理磁盘空间
-        uses: jlumbroso/free-disk-space@main
+        uses: endersonmenezes/free-disk-space@v4
         with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          remove_swap: true
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+          remove_packages_one_command: true
+          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
+          rm_cmd: "rm"
+          rmz_version: "3.2.0"
+          testing: false
 
       - name: 检出仓库代码
         uses: actions/checkout@v4
@@ -71,7 +75,7 @@ jobs:
         run: |
           mkdir -p ${{ env.BUILD_DIR }} ${{ env.TOOLCHAIN_DIR }} ${{ env.OPENWRT_DIR }}
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
-          xh --retry 3 --retry-delay 5 --check-status --download "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.zst
+          curl -L --retry 3 --retry-delay 5 -f -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
           [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链文件为空"; exit 1; }
           rm -rf /home/runner/build/toolchain-extract
           mkdir -p /home/runner/build/toolchain-extract
@@ -113,9 +117,8 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-          xh --retry 3 --retry-delay 5 --check-status --download \
-            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default \
-            -o feeds.conf.default
+          curl -L --retry 3 --retry-delay 5 -f -o feeds.conf.default \
+            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
           [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 为空"; exit 1; }
           ./scripts/feeds update -a
           ./scripts/feeds install -a
