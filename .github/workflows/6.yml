@@ -126,7 +126,7 @@ jobs:
           cat diffconfig > .config
           ./scripts/ext-toolchain.sh \
             --toolchain ${{ env.TOOLCHAIN_DIR }} \
-            --config rockchip/armv8
+            --overwrite-config --config rockchip/armv8 
 
       - name: 替换为 ImmortalWrt 的 feeds 配置
         working-directory: ${{ env.OPENWRT_DIR }}
