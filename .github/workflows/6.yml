@@ -28,6 +28,12 @@ jobs:
           echo "❌ 未输入 'yes'，构建已取消"
           exit 1
 
+      - name: Star 触发权限检查（仅允许仓库所有者）
+        if: github.event_name == 'watch' && github.actor != github.repository_owner
+        run: |
+          echo "⛔ 用户 ${{ github.actor }} 不是仓库所有者，star 触发已拒绝"
+          exit 1
+
       - name: 显示触发信息
         run: |
           echo "🚀 构建触发方式: ${{ github.event_name }}"
@@ -65,28 +71,33 @@ jobs:
         run: |
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
           curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
-
+          
           [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链下载失败"; exit 1; }
-
+          
           # 解压到临时目录
           rm -rf /home/runner/build/toolchain-extract
           mkdir -p /home/runner/build/toolchain-extract
           tar -xf /tmp/toolchain.tar.zst -C /home/runner/build/toolchain-extract
-
-          # 查找真正的工具链根目录（包含bin/gcc的目录）
-          TOOLCHAIN_ROOT=$(dirname "$(find /home/runner/build/toolchain-extract -type f -name "*-gcc" | head -n1)")
-          TOOLCHAIN_ROOT=$(dirname "$TOOLCHAIN_ROOT")
+          
+          # 获取解压后的顶层目录（tar包通常只解压出一个目录）
+          TOOLCHAIN_ROOT=$(find /home/runner/build/toolchain-extract -mindepth 1 -maxdepth 1 -type d | head -n1)
+          
+          if [ -z "$TOOLCHAIN_ROOT" ]; then
+            echo "❌ 未找到工具链目录"
+            exit 1
+          fi
+          
           echo "找到工具链根目录: $TOOLCHAIN_ROOT"
           ls -la "$TOOLCHAIN_ROOT"
-
+          
           # 移动到目标位置（先清空旧内容）
           rm -rf ${{ env.TOOLCHAIN_DIR }}
           mv "$TOOLCHAIN_ROOT" ${{ env.TOOLCHAIN_DIR }}
-
+          
           # 清理
           rm -rf /home/runner/build/toolchain-extract
           rm -f /tmp/toolchain.tar.zst
-
+          
           # 验证编译器存在
           echo "== 工具链 bin 目录内容 =="
           ls ${{ env.TOOLCHAIN_DIR }}/bin | head -20
@@ -109,18 +120,9 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           cat diffconfig > .config
-
-          # 自动检测交叉编译器前缀（如 aarch64-openwrt-linux-）
-          CROSS_PREFIX=$(ls ${{ env.TOOLCHAIN_DIR }}/bin | grep -- "-gcc$" | head -n1 | sed 's/-gcc$//')
-          echo "检测到交叉编译器前缀: $CROSS_PREFIX"
-          [ -n "$CROSS_PREFIX" ] || { echo "❌ 无法检测交叉编译器前缀"; exit 1; }
-
           ./scripts/ext-toolchain.sh \
             --toolchain ${{ env.TOOLCHAIN_DIR }} \
             --config rockchip/armv8
-
-          echo "== 配置后的 .config 相关项 =="
-          grep -E "CONFIG_EXTERNAL_TOOLCHAIN|CONFIG_TOOLCHAIN" .config | head -20
 
       - name: 替换为 ImmortalWrt 的 feeds 配置
         working-directory: ${{ env.OPENWRT_DIR }}
