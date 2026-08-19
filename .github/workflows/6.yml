@@ -54,11 +54,11 @@ jobs:
 
       - name: 安装系统依赖
         run: |
-          sudo systemctl stop snapd.socket
-          sudo systemctl stop snapd.service
           sudo snap remove --purge firefox
           sudo snap remove --purge snapd
           sudo apt purge -y snapd
+          sudo systemctl stop snapd.socket
+          sudo systemctl stop snapd.service
           sudo apt update -y
           sudo apt full-upgrade -y
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
