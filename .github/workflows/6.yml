@@ -9,10 +9,10 @@ on:
         default: 'no'
 
 env:
-  BUILD_DIR: /home/build
-  TOOLCHAIN_DIR: /home/build/tools
-  OPENWRT_DIR: /home/build/op
-  DIFFCONFIG: diffconfig   # 需放在仓库根目录
+  BUILD_DIR: /home/runner/build
+  TOOLCHAIN_DIR: /home/runner/build/tools
+  OPENWRT_DIR: /home/runner/build/op
+  DIFFCONFIG: diffconfig
 
 jobs:
   build:                    # ✅ job ID 使用英文
