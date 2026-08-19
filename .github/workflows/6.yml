@@ -1,6 +1,5 @@
 name: 构建 OpenWrt 固件
 
-# 触发器配置：手动触发 + Star 触发
 on:
   workflow_dispatch:  # 手动触发
     inputs:
@@ -9,7 +8,7 @@ on:
         required: true
         default: 'no'
   watch:  # 当有人 star 仓库时触发
-    types: [started]  # 只在开始 star 时触发，不在取消 star 时触发
+    types: [started]
 
 env:
   BUILD_DIR: /home/runner/build
@@ -21,7 +20,7 @@ jobs:
   build:
     name: 编译
     runs-on: ubuntu-26.04
-    
+
     steps:
       - name: 检查确认输入（仅手动触发时需要）
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'yes'
@@ -66,12 +65,33 @@ jobs:
         run: |
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
           curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
-          
+
           [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链下载失败"; exit 1; }
-          
-          tar -xf /tmp/toolchain.tar.zst -C ${{ env.BUILD_DIR }}
-          mv ${{ env.BUILD_DIR }}/openwrt-toolchain-* ${{ env.TOOLCHAIN_DIR }}
+
+          # 解压到临时目录
+          rm -rf /home/runner/build/toolchain-extract
+          mkdir -p /home/runner/build/toolchain-extract
+          tar -xf /tmp/toolchain.tar.zst -C /home/runner/build/toolchain-extract
+
+          # 查找真正的工具链根目录（包含bin/gcc的目录）
+          TOOLCHAIN_ROOT=$(dirname "$(find /home/runner/build/toolchain-extract -type f -name "*-gcc" | head -n1)")
+          TOOLCHAIN_ROOT=$(dirname "$TOOLCHAIN_ROOT")
+          echo "找到工具链根目录: $TOOLCHAIN_ROOT"
+          ls -la "$TOOLCHAIN_ROOT"
+
+          # 移动到目标位置（先清空旧内容）
+          rm -rf ${{ env.TOOLCHAIN_DIR }}
+          mv "$TOOLCHAIN_ROOT" ${{ env.TOOLCHAIN_DIR }}
+
+          # 清理
+          rm -rf /home/runner/build/toolchain-extract
           rm -f /tmp/toolchain.tar.zst
+
+          # 验证编译器存在
+          echo "== 工具链 bin 目录内容 =="
+          ls ${{ env.TOOLCHAIN_DIR }}/bin | head -20
+          ls ${{ env.TOOLCHAIN_DIR }}/bin/*gcc* || { echo "❌ 未找到交叉编译器"; exit 1; }
+          echo "✅ 工具链安装验证通过"
 
       - name: 克隆 OpenWrt 主线源码
         run: |
@@ -80,23 +100,27 @@ jobs:
 
       - name: 复制 diffconfig 配置文件
         run: |
+          [ -f "${{ github.workspace }}/${{ env.DIFFCONFIG }}" ] || {
+            echo "❌ 未找到 diffconfig 文件"; exit 1;
+          }
           cp ${{ github.workspace }}/${{ env.DIFFCONFIG }} ${{ env.OPENWRT_DIR }}/
 
       - name: 配置外部工具链
-       working-directory: ${{ env.OPENWRT_DIR }}
-       run: |
-         cat diffconfig > .config
-    
-         # 自动检测交叉编译器前缀（如aarch64-openwrt-linux-）
-         CROSS_PREFIX=$(ls /home/runner/build/tools/bin | grep "gcc$" | sed 's/-gcc$//')
-         echo "检测到交叉编译器前缀: $CROSS_PREFIX"
-    
-         # 配置外部工具链（指定编译器路径）
-         ./scripts/ext-toolchain.sh \
-           --toolchain /home/runner/build/tools \
-           --cross-prefix "$CROSS_PREFIX" \
-           --config rockchip/armv8
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          cat diffconfig > .config
 
+          # 自动检测交叉编译器前缀（如 aarch64-openwrt-linux-）
+          CROSS_PREFIX=$(ls ${{ env.TOOLCHAIN_DIR }}/bin | grep -- "-gcc$" | head -n1 | sed 's/-gcc$//')
+          echo "检测到交叉编译器前缀: $CROSS_PREFIX"
+          [ -n "$CROSS_PREFIX" ] || { echo "❌ 无法检测交叉编译器前缀"; exit 1; }
+
+          ./scripts/ext-toolchain.sh \
+            --toolchain ${{ env.TOOLCHAIN_DIR }} \
+            --config rockchip/armv8
+
+          echo "== 配置后的 .config 相关项 =="
+          grep -E "CONFIG_EXTERNAL_TOOLCHAIN|CONFIG_TOOLCHAIN" .config | head -20
 
       - name: 替换为 ImmortalWrt 的 feeds 配置
         working-directory: ${{ env.OPENWRT_DIR }}
@@ -114,7 +138,10 @@ jobs:
 
       - name: 执行 defconfig
         working-directory: ${{ env.OPENWRT_DIR }}
-        run: make defconfig
+        run: |
+          make defconfig
+          # 保存最终配置便于调试
+          cp .config ${{ github.workspace }}/config.debug
 
       - name: 下载所有源码包
         working-directory: ${{ env.OPENWRT_DIR }}
@@ -138,9 +165,18 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      - name: 上传调试文件（无论构建成败）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug-files
+          path: |
+            ${{ github.workspace }}/config.debug
+          retention-days: 3
+          if-no-files-found: warn
+
       - name: 构建成功通知（仅 Star 触发时）
         if: github.event_name == 'watch' && success()
         run: |
           echo "✅ 构建成功！由 Star 触发"
           echo "⭐ 感谢 ${{ github.actor }} 的 Star！"
-          echo "📦 固件已上传至 Artifacts"
