@@ -39,17 +39,13 @@ jobs:
       - name: 清理磁盘空间（预留足够空间编译 OpenWrt）
         uses: jlumbroso/free-disk-space@main
         with:
-          # this might remove tools that are actually needed,
-          # if set to "true" but frees about 6 GB
-          tool-cache: false      
-          # all of these default to true, but feel free to set to
-          # "false" if necessary for your workflow
+          tool-cache: false
           android: true
           dotnet: true
           haskell: true
           large-packages: true
           docker-images: true
-          swap-storage: true        
+          swap-storage: true
 
       - name: 检出仓库代码
         uses: actions/checkout@v4
@@ -76,8 +72,7 @@ jobs:
       - name: 下载并解压官方工具链
         run: |
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
-          # curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
-          xh -d "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.zst
+          curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
           [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链下载失败"; exit 1; }
           rm -rf /home/runner/build/toolchain-extract
           mkdir -p /home/runner/build/toolchain-extract
@@ -128,10 +123,9 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-          # curl -fL --retry 3 -o feeds.conf.default \
-          #   https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
-          # [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 下载失败"; exit 1; }
-          xh -d https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          curl -fL --retry 3 -o feeds.conf.default \
+            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 下载失败"; exit 1; }
           ls feeds.conf.default
 
       - name: 更新并安装 feeds
