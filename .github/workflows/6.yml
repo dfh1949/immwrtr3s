@@ -83,10 +83,20 @@ jobs:
           cp ${{ github.workspace }}/${{ env.DIFFCONFIG }} ${{ env.OPENWRT_DIR }}/
 
       - name: 配置外部工具链
-        working-directory: ${{ env.OPENWRT_DIR }}
-        run: |
-          cat diffconfig > .config
-          ./scripts/ext-toolchain.sh --toolchain ${{ env.TOOLCHAIN_DIR }} --config rockchip/armv8
+       working-directory: ${{ env.OPENWRT_DIR }}
+       run: |
+         cat diffconfig > .config
+    
+         # 自动检测交叉编译器前缀（如aarch64-openwrt-linux-）
+         CROSS_PREFIX=$(ls /home/runner/build/tools/bin | grep "gcc$" | sed 's/-gcc$//')
+         echo "检测到交叉编译器前缀: $CROSS_PREFIX"
+    
+         # 配置外部工具链（指定编译器路径）
+         ./scripts/ext-toolchain.sh \
+           --toolchain /home/runner/build/tools \
+           --cross-prefix "$CROSS_PREFIX" \
+           --config rockchip/armv8
+
 
       - name: 替换为 ImmortalWrt 的 feeds 配置
         working-directory: ${{ env.OPENWRT_DIR }}
