@@ -36,7 +36,7 @@ jobs:
           echo "👤 触发者: ${{ github.actor }}"
           echo "⏰ 触发时间: $(date)"
 
-      - name: 清理磁盘空间（预留足够空间编译 OpenWrt）
+      - name: 清理磁盘空间
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
@@ -53,6 +53,7 @@ jobs:
       - name: 安装系统依赖
         run: |
           sudo apt update -y
+          sudo apt full-upgrade -y
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
             bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
             g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
@@ -60,19 +61,14 @@ jobs:
             libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
             ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
-            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd xh
-
-      - name: 创建工作目录
-        run: |
-          mkdir -p ${{ env.BUILD_DIR }}
-          mkdir -p ${{ env.TOOLCHAIN_DIR }}
-          mkdir -p ${{ env.OPENWRT_DIR }}
+            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
 
       - name: 下载并解压官方工具链
         run: |
+          mkdir -p ${{ env.BUILD_DIR }} ${{ env.TOOLCHAIN_DIR }} ${{ env.OPENWRT_DIR }}
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
-          curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
-          [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链下载失败"; exit 1; }
+          xh --retry 3 --retry-delay 5 --check-status --download "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.zst
+          [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链文件为空"; exit 1; }
           rm -rf /home/runner/build/toolchain-extract
           mkdir -p /home/runner/build/toolchain-extract
           tar -xf /tmp/toolchain.tar.zst -C /home/runner/build/toolchain-extract
@@ -82,19 +78,15 @@ jobs:
             echo "❌ 未找到工具链顶层目录"
             exit 1
           fi
-          echo "顶层目录: $TOOLCHAIN_TOP"
           TOOLCHAIN_REAL=$(find "$TOOLCHAIN_TOP" -maxdepth 2 -type d -name bin -printf "%h\n" | head -n1)
           if [ -z "$TOOLCHAIN_REAL" ]; then
             echo "❌ 未找到包含 bin 的工具链目录"
             exit 1
           fi
-          echo "真正的工具链目录: $TOOLCHAIN_REAL"
           rm -rf ${{ env.TOOLCHAIN_DIR }}
           mv "$TOOLCHAIN_REAL" ${{ env.TOOLCHAIN_DIR }}
           rm -rf "$EXTRACT_DIR"
           rm -f /tmp/toolchain.tar.zst
-          echo "== 工具链 bin 目录内容 =="
-          ls ${{ env.TOOLCHAIN_DIR }}/bin | head -20
           ls ${{ env.TOOLCHAIN_DIR }}/bin/*gcc* || { echo "❌ 未找到交叉编译器"; exit 1; }
           echo "✅ 工具链安装验证通过"
 
@@ -103,33 +95,24 @@ jobs:
           git clone -b main --single-branch --depth=1 \
             https://github.com/openwrt/openwrt.git ${{ env.OPENWRT_DIR }}
 
-      - name: 复制 diffconfig 配置文件
-        run: |
-          [ -f "${{ github.workspace }}/${{ env.DIFFCONFIG }}" ] || {
-            echo "❌ 未找到 diffconfig 文件"; exit 1;
-          }
-          cp ${{ github.workspace }}/${{ env.DIFFCONFIG }} ${{ env.OPENWRT_DIR }}/
-
-      - name: 配置外部工具链
+      - name: 复制 diffconfig 并配置外部工具链
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
+          [ -f "${{ github.workspace }}/${{ env.DIFFCONFIG }}" ] || { echo "❌ 未找到 diffconfig 文件"; exit 1; }
+          cp ${{ github.workspace }}/${{ env.DIFFCONFIG }} diffconfig
           cat diffconfig > .config
           ./scripts/ext-toolchain.sh \
             --toolchain ${{ env.TOOLCHAIN_DIR }} \
             --overwrite-config --config rockchip/armv8
 
-      - name: 替换为 ImmortalWrt 的 feeds 配置
+      - name: 下载 ImmortalWrt feeds 配置并更新 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-          curl -fL --retry 3 -o feeds.conf.default \
-            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
-          [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 下载失败"; exit 1; }
-          ls feeds.conf.default
-
-      - name: 更新并安装 feeds
-        working-directory: ${{ env.OPENWRT_DIR }}
-        run: |
+          xh --retry 3 --retry-delay 5 --check-status --download \
+            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default \
+            -o feeds.conf.default
+          [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 为空"; exit 1; }
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -161,7 +144,7 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      - name: 上传调试文件（无论构建成败）
+      - name: 上传调试文件
         if: always()
         uses: actions/upload-artifact@v4
         with:
