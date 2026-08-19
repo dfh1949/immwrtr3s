@@ -36,20 +36,25 @@ jobs:
           echo "👤 触发者: ${{ github.actor }}"
           echo "⏰ 触发时间: $(date)"
 
-      - name: 清理磁盘空间
+      - name: 清理磁盘空间 (最大化)
         uses: endersonmenezes/free-disk-space@v4
         with:
+         # 基础清理选项
           remove_android: true
           remove_dotnet: true
           remove_haskell: true
           remove_tool_cache: true
           remove_swap: true
-          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
-          remove_packages_one_command: true
-          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle"
-          rm_cmd: "rm"
+         # 使用 rmz 加速删除
+          rm_cmd: "rmz"
           rmz_version: "3.2.0"
-          testing: false
+         # 删除大量预装软件包 (参考官方推荐)
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-* mono* ghc* cabal* php* ruby* *openjdk* ant* maven* gradle* docker* containerd* podman* buildah* skopeo*"
+          remove_packages_one_command: true
+         # 删除大型目录
+          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle /usr/share/dotnet /usr/share/java /usr/share/rust /usr/local/go /opt/ghc /opt/hostedtoolcache /usr/local/.ghcup /usr/share/racket /usr/local/share/boost"
+          testing: false # 确保设置为 false 以实际执行删除
+      
 
       - name: 检出仓库代码
         uses: actions/checkout@v4
