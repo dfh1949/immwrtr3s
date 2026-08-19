@@ -19,7 +19,7 @@ env:
 jobs:
   build:
     name: 编译
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # 仅当手动触发，或 Star 触发且触发者为仓库所有者时运行
     if: |
       github.event_name == 'workflow_dispatch' ||
