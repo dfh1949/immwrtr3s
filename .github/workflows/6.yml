@@ -19,10 +19,9 @@ env:
 jobs:
   build:
     name: 编译
-    runs-on: ubuntu-26.04
-    # 仅当手动触发，或 Star 触发且触发者为仓库所有者时运行
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'watch' && github.actor == github.repository_owner)
-
+    runs-on: ubuntu-26.04   # 保持您指定的镜像
+    # 修正：用 ${{ }} 包裹条件表达式
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'watch' && github.actor == github.repository_owner) }}
     steps:
       - name: 检查确认输入（仅手动触发时需要）
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'yes'
