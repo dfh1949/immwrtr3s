@@ -1,29 +1,40 @@
 name: 构建 OpenWrt 固件
 
+# 触发器配置：手动触发 + Star 触发
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 手动触发
     inputs:
       confirm:
         description: '⚠️ 请确认是否开始构建（输入 yes 以继续）'
         required: true
         default: 'no'
+  watch:  # 当有人 star 仓库时触发
+    types: [started]  # 只在开始 star 时触发，不在取消 star 时触发
 
 env:
   BUILD_DIR: /home/runner/build
   TOOLCHAIN_DIR: /home/runner/build/tools
   OPENWRT_DIR: /home/runner/build/op
-  DIFFCONFIG: diffconfig
+  DIFFCONFIG: diffconfig   # 需放在仓库根目录
 
 jobs:
-  build:                    # ✅ job ID 使用英文
-    name: 编译              # ✅ 显示名称可用中文
+  build:
+    name: 编译
     runs-on: ubuntu-26.04
+    
     steps:
-      - name: 检查确认输入
-        if: github.event.inputs.confirm != 'yes'
+      - name: 检查确认输入（仅手动触发时需要）
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'yes'
         run: |
           echo "❌ 未输入 'yes'，构建已取消"
           exit 1
+
+      - name: 显示触发信息
+        run: |
+          echo "🚀 构建触发方式: ${{ github.event_name }}"
+          echo "📌 仓库: ${{ github.repository }}"
+          echo "👤 触发者: ${{ github.actor }}"
+          echo "⏰ 触发时间: $(date)"
 
       - name: 清理磁盘空间（预留足够空间编译 OpenWrt）
         run: |
@@ -43,8 +54,7 @@ jobs:
           sudo apt update
           sudo apt install -y \
             bzip2 g++ gawk gcc git glibc-source libncurses-dev make \
-            wget unzip xh
-          xh --version
+            wget unzip curl xz-utils zstd
 
       - name: 创建工作目录
         run: |
@@ -52,10 +62,13 @@ jobs:
           mkdir -p ${{ env.TOOLCHAIN_DIR }}
           mkdir -p ${{ env.OPENWRT_DIR }}
 
-      - name: 下载并解压官方工具链（使用 xh）
+      - name: 下载并解压官方工具链
         run: |
           TOOLCHAIN_URL="https://downloads.openwrt.org/snapshots/targets/rockchip/armv8/openwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst"
-          xh -d "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.zst
+          curl -fL --retry 3 --retry-delay 5 -o /tmp/toolchain.tar.zst "$TOOLCHAIN_URL"
+          
+          [ -s /tmp/toolchain.tar.zst ] || { echo "❌ 工具链下载失败"; exit 1; }
+          
           tar -xf /tmp/toolchain.tar.zst -C ${{ env.BUILD_DIR }}
           mv ${{ env.BUILD_DIR }}/openwrt-toolchain-* ${{ env.TOOLCHAIN_DIR }}
           rm -f /tmp/toolchain.tar.zst
@@ -79,7 +92,9 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-          xh -d https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          curl -fL --retry 3 -o feeds.conf.default \
+            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          [ -s feeds.conf.default ] || { echo "❌ feeds.conf.default 下载失败"; exit 1; }
 
       - name: 更新并安装 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
@@ -112,3 +127,10 @@ jobs:
             ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.tar.gz
           retention-days: 7
           if-no-files-found: error
+
+      - name: 构建成功通知（仅 Star 触发时）
+        if: github.event_name == 'watch' && success()
+        run: |
+          echo "✅ 构建成功！由 Star 触发"
+          echo "⭐ 感谢 ${{ github.actor }} 的 Star！"
+          echo "📦 固件已上传至 Artifacts"
