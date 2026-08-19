@@ -1,7 +1,7 @@
 name: 构建 OpenWrt 固件
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 仅手动触发
     inputs:
       confirm:
         description: '⚠️ 请确认是否开始构建（输入 yes 以继续）'
@@ -15,10 +15,10 @@ env:
   DIFFCONFIG: diffconfig   # 需放在仓库根目录
 
 jobs:
+  编译:
+    # 使用已发布的 Ubuntu 26.04 LTS
     runs-on: ubuntu-26.04
-    # 可选：添加环境审批（需在仓库 Settings/Environments 中预先配置 build 环境并设置审核者）
-    # environment:
-    #   name: build
+    
     steps:
       - name: 检查确认输入
         if: github.event.inputs.confirm != 'yes'
