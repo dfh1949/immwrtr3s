@@ -43,11 +43,17 @@ jobs:
         run: |
           echo "== 清理前磁盘使用情况 =="
           df -h
-          sudo docker system prune -af || true
-          sudo apt clean
-          sudo mv /usr/share/dotnet /usr/share/dotnet.bak
-          sudo mv /usr/local/lib/android /usr/local/lib/android.bak
-          sudo mv /opt/ghc /opt/ghc.bak
+          # 创建黑洞目录（内存中操作，极快）
+           mkdir /tmp/empty
+          # 并行发起 3 个 rsync 任务，同时清空三个目录
+          # --delete 会让目标目录完全等于空目录
+          sudo rsync -a --delete /tmp/empty/ /opt/ghc/ &
+          sudo rsync -a --delete /tmp/empty/ /usr/local/lib/android/ &
+          sudo rsync -a --delete /tmp/empty/ /usr/share/dotnet/ &
+          # 等待所有后台任务完成
+          wait
+          # 最后瞬间删掉三个空壳子
+          sudo rm -rf /opt/ghc /usr/local/lib/android /usr/share/dotnet
           echo "== 清理后磁盘使用情况 =="
           df -h
 
