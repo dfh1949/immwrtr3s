@@ -2,17 +2,43 @@ name: 构建 OpenWrt 固件
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: '⚠️ 请确认是否开始构建（输入 yes 以继续）'
+        required: true
+        default: 'no'
 
 env:
   BUILD_DIR: /home/build
   TOOLCHAIN_DIR: /home/build/tools
   OPENWRT_DIR: /home/build/op
-  DIFFCONFIG: diffconfig
+  DIFFCONFIG: diffconfig   # 需放在仓库根目录
 
 jobs:
   编译:
     runs-on: ubuntu-26.04
+    # 可选：添加环境审批（需在仓库 Settings/Environments 中预先配置 build 环境并设置审核者）
+    # environment:
+    #   name: build
     steps:
+      - name: 检查确认输入
+        if: github.event.inputs.confirm != 'yes'
+        run: |
+          echo "❌ 未输入 'yes'，构建已取消"
+          exit 1
+
+      - name: 清理磁盘空间（预留足够空间编译 OpenWrt）
+        run: |
+          echo "== 清理前磁盘使用情况 =="
+          df -h
+          # 移除 Docker 镜像（若存在）
+          sudo docker system prune -af || true
+          # 清理 apt 缓存
+          sudo apt clean
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          echo "== 清理后磁盘使用情况 =="
+          df -h
+
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
@@ -21,9 +47,7 @@ jobs:
           sudo apt update
           sudo apt install -y \
             bzip2 g++ gawk gcc git glibc-source libncurses-dev make \
-            wget unzip
-          # 通过 snap 安装 xh（避免手动下载二进制）
-          sudo snap install xh
+            wget unzip xh 
           xh --version
 
       - name: 创建工作目录
@@ -59,9 +83,7 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-          # 此处仍使用 wget（也可改用 xh，但无强制要求）
-          wget -O feeds.conf.default \
-            https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          xh  -d https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
 
       - name: 更新并安装 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
