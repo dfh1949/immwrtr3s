@@ -19,19 +19,17 @@ env:
 jobs:
   build:
     name: 编译
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
+    # 仅当手动触发，或 Star 触发且触发者为仓库所有者时运行
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'watch' && github.actor == github.repository_owner)
 
     steps:
       - name: 检查确认输入（仅手动触发时需要）
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.confirm != 'yes'
         run: |
           echo "❌ 未输入 'yes'，构建已取消"
-          exit 1
-
-      - name: Star 触发权限检查（仅允许仓库所有者）
-        if: github.event_name == 'watch' && github.actor != github.repository_owner
-        run: |
-          echo "⛔ 用户 ${{ github.actor }} 不是仓库所有者，star 触发已拒绝"
           exit 1
 
       - name: 显示触发信息
@@ -80,22 +78,28 @@ jobs:
           tar -xf /tmp/toolchain.tar.zst -C /home/runner/build/toolchain-extract
           
           # 获取解压后的顶层目录（tar包通常只解压出一个目录）
-          TOOLCHAIN_ROOT=$(find /home/runner/build/toolchain-extract -mindepth 1 -maxdepth 1 -type d | head -n1)
-          
-          if [ -z "$TOOLCHAIN_ROOT" ]; then
-            echo "❌ 未找到工具链目录"
+          EXTRACT_DIR=/home/runner/build/toolchain-extract
+          TOOLCHAIN_TOP=$(find "$EXTRACT_DIR" -mindepth 1 -maxdepth 1 -type d | head -n1)
+          if [ -z "$TOOLCHAIN_TOP" ]; then
+            echo "❌ 未找到工具链顶层目录"
             exit 1
           fi
+          echo "顶层目录: $TOOLCHAIN_TOP"
           
-          echo "找到工具链根目录: $TOOLCHAIN_ROOT"
-          ls -la "$TOOLCHAIN_ROOT"
+          # 查找包含 bin 子目录的目录（真正的工具链根）
+          TOOLCHAIN_REAL=$(find "$TOOLCHAIN_TOP" -maxdepth 2 -type d -name bin -printf "%h\n" | head -n1)
+          if [ -z "$TOOLCHAIN_REAL" ]; then
+            echo "❌ 未找到包含 bin 的工具链目录"
+            exit 1
+          fi
+          echo "真正的工具链目录: $TOOLCHAIN_REAL"
           
-          # 移动到目标位置（先清空旧内容）
+          # 移动真正的工具链目录到目标位置
           rm -rf ${{ env.TOOLCHAIN_DIR }}
-          mv "$TOOLCHAIN_ROOT" ${{ env.TOOLCHAIN_DIR }}
+          mv "$TOOLCHAIN_REAL" ${{ env.TOOLCHAIN_DIR }}
           
-          # 清理
-          rm -rf /home/runner/build/toolchain-extract
+          # 清理临时文件
+          rm -rf "$EXTRACT_DIR"
           rm -f /tmp/toolchain.tar.zst
           
           # 验证编译器存在
