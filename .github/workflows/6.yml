@@ -1,7 +1,7 @@
 name: 构建 OpenWrt 固件
 
 on:
-  workflow_dispatch:  # 仅手动触发
+  workflow_dispatch:
     inputs:
       confirm:
         description: '⚠️ 请确认是否开始构建（输入 yes 以继续）'
@@ -15,10 +15,9 @@ env:
   DIFFCONFIG: diffconfig   # 需放在仓库根目录
 
 jobs:
-  编译:
-    # 使用已发布的 Ubuntu 26.04 LTS
+  build:                    # ✅ job ID 使用英文
+    name: 编译              # ✅ 显示名称可用中文
     runs-on: ubuntu-26.04
-    
     steps:
       - name: 检查确认输入
         if: github.event.inputs.confirm != 'yes'
@@ -30,9 +29,7 @@ jobs:
         run: |
           echo "== 清理前磁盘使用情况 =="
           df -h
-          # 移除 Docker 镜像（若存在）
           sudo docker system prune -af || true
-          # 清理 apt 缓存
           sudo apt clean
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           echo "== 清理后磁盘使用情况 =="
@@ -41,12 +38,12 @@ jobs:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 安装系统依赖（含 xh via snap）
+      - name: 安装系统依赖
         run: |
           sudo apt update
           sudo apt install -y \
             bzip2 g++ gawk gcc git glibc-source libncurses-dev make \
-            wget unzip xh 
+            wget unzip xh
           xh --version
 
       - name: 创建工作目录
@@ -82,7 +79,7 @@ jobs:
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           rm -f feeds.conf.default
-          xh  -d https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
+          xh -d https://github.com/immortalwrt/immortalwrt/raw/refs/heads/master/feeds.conf.default
 
       - name: 更新并安装 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
@@ -96,22 +93,20 @@ jobs:
 
       - name: 下载所有源码包
         working-directory: ${{ env.OPENWRT_DIR }}
-        run: |
-          make download -j8 V=s
+        run: make download -j8 V=s
         env:
           FORCE_UNSAFE_CONFIGURE: 1
 
       - name: 编译固件
         working-directory: ${{ env.OPENWRT_DIR }}
-        run: |
-          make -j$(nproc) V=s 2>&1
+        run: make -j$(nproc) V=s
         env:
           FORCE_UNSAFE_CONFIGURE: 1
 
       - name: 上传固件产物
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-rockchip-armv8-固件
+          name: openwrt-rockchip-armv8-firmware
           path: |
             ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img.gz
             ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.tar.gz
