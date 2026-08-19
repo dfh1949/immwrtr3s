@@ -52,6 +52,8 @@ jobs:
 
       - name: 安装系统依赖
         run: |
+          sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/sources.list
+          sudo sed -i 's/security\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/sources.list
           sudo apt update -y
           sudo apt full-upgrade -y
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
