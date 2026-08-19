@@ -15,7 +15,6 @@ env:
   DIFFCONFIG: diffconfig   # 需放在仓库根目录
 
 jobs:
-  编译:
     runs-on: ubuntu-26.04
     # 可选：添加环境审批（需在仓库 Settings/Environments 中预先配置 build 环境并设置审核者）
     # environment:
