@@ -121,9 +121,8 @@ jobs:
         with:
           name: immortalwrtwrt-rockchip-armv8-firmware
           path: |
-         #   ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img.gz
-          #  ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.tar.gz
-            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*
+            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img.gz
+            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img
           retention-days: 7
           if-no-files-found: error
 
