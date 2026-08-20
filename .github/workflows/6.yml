@@ -76,7 +76,7 @@ jobs:
           mkdir /tmp/tool  /home/runner/build /home/runner/build/tools /home/runner/build/llvm
           tar -xf /tmp/ll.tar.zst -C /home/runner/build/llvm
           tar -xf /tmp/tool.tar.zst --strip-components=1 -C /tmp/tool
-          mv /tmp/tool/toolchain-*  /home/runner/build/tools
+          mv /tmp/tool/toolchain-*/  /home/runner/build/tools
           ls /home/runner/build/tools
           rm -rf /tmp/ll.tar.zst /tmp/tool.tar.zst /tmp/tool
 
