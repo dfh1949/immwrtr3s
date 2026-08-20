@@ -86,11 +86,11 @@ jobs:
           git clone -b master --single-branch --depth=1 https://github.com/immortalwrt/immortalwrt.git /home/runner/build/op
 
       - name: 复制 diffconfig 并配置外部工具链
-        working-directory: ${{ env.OPENWRT_DIR }}
         run: |
-          [ -f "${{ github.workspace }}/${{ env.DIFFCONFIG }}" ] || { echo "❌ 未找到 diffconfig 文件"; exit 1; }
-          cp ${{ github.workspace }}/${{ env.DIFFCONFIG }} diffconfig
-          cat diffconfig > .config
+          ls /home/runner
+          rm -rf /home/runner/build/op/.config
+          cat diffconfig > /home/runner/build/op/.config
+          cd /home/runner/build/op
           ./scripts/ext-toolchain.sh \
             --toolchain ${{ env.TOOLCHAIN_DIR }} \
             --overwrite-config --config rockchip/armv8
