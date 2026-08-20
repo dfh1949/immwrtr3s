@@ -90,7 +90,7 @@ jobs:
           rm -rf /home/runner/build/op/.config
           cat diffconfig > /home/runner/build/op/.config
           cd /home/runner/build/op
-          ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools --overwrite-config --config rockchip/armv8
+          ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools/toolchain-*/ --overwrite-config --config rockchip/armv8
 
       - name: 下载 ImmortalWrt feeds 配置并更新 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
