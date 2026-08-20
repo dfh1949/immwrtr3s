@@ -13,7 +13,6 @@ on:
 
 env:
   BUILD_DIR: /home/runner/build
-  TOOLCHAIN_DIR: /home/runner/build/tools
   OPENWRT_DIR: /home/runner/build/op
   DIFFCONFIG: diffconfig
 
@@ -72,16 +71,13 @@ jobs:
 
       - name: 下载并解压官方工具链
         run: |
-          ls
-          echo "以下"
-          cat diffconfig
-          echo "以上"
           axel -n 4 -o /tmp/tool.tar.zst https://downloads.immortalwrt.org/snapshots/targets/rockchip/armv8/immortalwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst
           axel -n 4 -o /tmp/ll.tar.zst https://downloads.immortalwrt.org/snapshots/targets/rockchip/armv8/llvm-bpf-22.1.3.Linux-x86_64.tar.zst
           mkdir /tmp/tool  /home/runner/build /home/runner/build/tools /home/runner/build/llvm
           tar -xf /tmp/ll.tar.zst -C /home/runner/build/llvm
           tar -xf /tmp/tool.tar.zst --strip-components=1 -C /tmp/tool
           mv /tmp/tool/toolchain-*  /home/runner/build/tools
+          ls /home/runner/build/tools
           rm -rf /tmp/ll.tar.zst /tmp/tool.tar.zst /tmp/tool
 
 
@@ -94,9 +90,7 @@ jobs:
           rm -rf /home/runner/build/op/.config
           cat diffconfig > /home/runner/build/op/.config
           cd /home/runner/build/op
-          ./scripts/ext-toolchain.sh \
-            --toolchain ${{ env.TOOLCHAIN_DIR }} \
-            --overwrite-config --config rockchip/armv8
+          ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools --overwrite-config --config rockchip/armv8
 
       - name: 下载 ImmortalWrt feeds 配置并更新 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
