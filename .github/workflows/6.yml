@@ -74,7 +74,7 @@ jobs:
             libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
             ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
-            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd axel
 
       - name: 下载并解压官方工具链
         run: |
@@ -105,7 +105,7 @@ jobs:
 
       - name: 克隆 OpenWrt 主线源码
         run: |
-          git clone -b main --single-branch --depth=1 https://github.com/openwrt/openwrt.git ${{ env.OPENWRT_DIR }}
+          git clone -b main --single-branch --depth=1 https://github.com/immortalwrt/immortalwrt.git ${{ env.OPENWRT_DIR }}
       - name: 复制 diffconfig 并配置外部工具链
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
