@@ -105,8 +105,7 @@ jobs:
 
       - name: 克隆 OpenWrt 主线源码
         run: |
-         ## git clone -b main --single-branch --depth=1 https://github.com/openwrt/openwrt.git ${{ env.OPENWRT_DIR }}
-          git clone -b master --single-branch --depth=1 https://github.com/immortalwrt/immortalwrt.git ${{ env.OPENWRT_DIR }}
+          git clone -b main --single-branch --depth=1 https://github.com/openwrt/openwrt.git ${{ env.OPENWRT_DIR }}
       - name: 复制 diffconfig 并配置外部工具链
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
