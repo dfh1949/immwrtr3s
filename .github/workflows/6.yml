@@ -85,8 +85,9 @@ jobs:
         run: |
           git clone -b master --single-branch --depth=1 https://github.com/immortalwrt/immortalwrt.git /home/runner/build/op
 
-      - name: 复制 diffconfig 并配置外部工具链
+      - name: 复制config 并配置外部工具链
         run: |
+          cat kconfig > /home/runner/build/op/target/linux/rockchip/armv8/config-6.18
           rm -rf /home/runner/build/op/.config
           cat diffconfig > /home/runner/build/op/.config
           cd /home/runner/build/op
