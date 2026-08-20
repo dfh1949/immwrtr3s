@@ -88,7 +88,6 @@ jobs:
       - name: 复制config 并配置外部工具链
         run: |
           cat kconfig > /home/runner/build/op/target/linux/rockchip/armv8/config-6.18
-          rm -rf /home/runner/build/op/.config
           cat diffconfig > /home/runner/build/op/.config
           cd /home/runner/build/op
           ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools/toolchain-*/ --overwrite-config --config rockchip/armv8
