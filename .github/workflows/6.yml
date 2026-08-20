@@ -149,7 +149,7 @@ jobs:
         with:
           name: openwrt-rockchip-armv8-firmware
           path: |
-            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img.gz
+            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img
             ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.tar.gz
           retention-days: 7
           if-no-files-found: error
