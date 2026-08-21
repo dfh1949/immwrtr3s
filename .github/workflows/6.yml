@@ -10,9 +10,7 @@ on:
   watch:
     types: [started]
 
-
 env:
-  BUILD_DIR: /home/runner/build
   OPENWRT_DIR: /home/runner/build/op
   DIFFCONFIG: diffconfig
 
