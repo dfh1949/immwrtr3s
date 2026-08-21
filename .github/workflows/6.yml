@@ -84,17 +84,18 @@ jobs:
       - name: 克隆 OpenWrt 主线源码
         run: |
           git clone -b master --single-branch --depth=1 https://github.com/immortalwrt/immortalwrt.git /home/runner/build/op
-
-      - name: 复制config
-        run: |
-          cat kconfig > /home/runner/build/op/target/linux/rockchip/armv8/config-6.18
-          cat diffconfig > /home/runner/build/op/.config
-
+          
       - name: 下载 ImmortalWrt feeds 配置并更新 feeds
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          
+      - name: 复制config
+        working-directory: ${{ env.OPENWRT_DIR }}
+        run: |
+          cat ${{ github.workspace }}/kconfig > ${{ env.OPENWRT_DIR }}/target/linux/rockchip/armv8/config-6.18
+          cat ${{ github.workspace }}/diffconfig > ${{ env.OPENWRT_DIR }}/.config
           ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools/toolchain-*/ --overwrite-config --config rockchip/armv8
           make defconfig
           cp .config ${{ github.workspace }}/config.debug
