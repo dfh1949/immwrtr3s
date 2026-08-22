@@ -59,7 +59,7 @@ jobs:
             gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
             python3-setuptools rsync swig unzip zlib1g-dev file wget dwarves \
             llvm python3-pyelftools libpython3-dev aria2 jq qemu-utils ccache rename \
-            libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev axel
+            libelf-dev device-tree-compiler libgmp3-dev libmpc-dev libfuse-dev axel bat
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
 
@@ -71,9 +71,7 @@ jobs:
           tar -xf /tmp/ll.tar.zst -C /home/runner/build/llvm
           tar -xf /tmp/tool.tar.zst --strip-components=1 -C /tmp/tool
           mv /tmp/tool/toolchain-*/  /home/runner/build/tools
-          ls /home/runner/build/tools
           rm -rf /tmp/ll.tar.zst /tmp/tool.tar.zst /tmp/tool
-
 
       - name: 克隆 OpenWrt 主线源码
         run: |
@@ -88,15 +86,15 @@ jobs:
       - name: 复制config
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
-          cat ${{ github.workspace }}/kconfig > ${{ env.OPENWRT_DIR }}/target/linux/rockchip/armv8/config-6.18
-          cat ${{ github.workspace }}/diffconfig > ${{ env.OPENWRT_DIR }}/.config
+          batcat ${{ github.workspace }}/kconfig > ${{ env.OPENWRT_DIR }}/target/linux/rockchip/armv8/config-6.18
+          batcat ${{ github.workspace }}/gconfig > ${{ env.OPENWRT_DIR }}/target/linux/generic/config-6.18
+          batcat ${{ github.workspace }}/diffconfig > ${{ env.OPENWRT_DIR }}/.config
           ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools/toolchain-*/ --overwrite-config --config rockchip/armv8
           make defconfig
-          cp .config ${{ github.workspace }}/config.debug
 
       - name: 下载所有源码包
         working-directory: ${{ env.OPENWRT_DIR }}
-        run: make download -j8 V=s
+        run: make download -j4 V=s
         env:
           FORCE_UNSAFE_CONFIGURE: 1
 
@@ -112,20 +110,9 @@ jobs:
           name: immortalwrtwrt-rockchip-armv8-firmware
           path: |
             ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img.gz
-            ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.img
             ${{ env.OPENWRT_DIR }}/bin/targets/rockchip/armv8/*.buildinfo
           retention-days: 7
           if-no-files-found: error
-
-      - name: 上传调试文件
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-debug-files
-          path: |
-            ${{ github.workspace }}/config.debug
-          retention-days: 3
-          if-no-files-found: warn
 
       - name: 构建成功通知（仅 Star 触发时）
         if: github.event_name == 'watch' && success()
