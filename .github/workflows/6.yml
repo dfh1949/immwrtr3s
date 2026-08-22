@@ -86,7 +86,7 @@ jobs:
       - name: 复制config
         working-directory: ${{ env.OPENWRT_DIR }}
         run: |
-          # batcat ${{ github.workspace }}/kconfig > ${{ env.OPENWRT_DIR }}/target/linux/rockchip/armv8/config-6.18
+          batcat ${{ github.workspace }}/kconfig > ${{ env.OPENWRT_DIR }}/target/linux/rockchip/armv8/config-6.18
           batcat ${{ github.workspace }}/gconfig > ${{ env.OPENWRT_DIR }}/target/linux/generic/config-6.18
           batcat ${{ github.workspace }}/diffconfig > ${{ env.OPENWRT_DIR }}/.config
           ./scripts/ext-toolchain.sh --toolchain /home/runner/build/tools/toolchain-*/ --overwrite-config --config rockchip/armv8
