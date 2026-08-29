@@ -74,10 +74,9 @@ jobs:
             https://downloads.immortalwrt.org/snapshots/targets/rockchip/armv8/immortalwrt-toolchain-rockchip-armv8_gcc-14.4.0_musl.Linux-x86_64.tar.zst
           axel -n 8 -o /tmp/ll.tar.zst \
             https://downloads.immortalwrt.org/snapshots/targets/rockchip/armv8/llvm-bpf-22.1.3.Linux-x86_64.tar.zst
-          tar -xf /tmp/ll.tar.zst -C /home/runner/build/llvm
-          tar -xf /tmp/tool.tar.zst --strip-components=1 -C /tmp/tool
-          mv /tmp/tool/toolchain-*/ /home/runner/build/tools/
-          rm -rf /tmp/*.tar.zst /tmp/tool
+          tar --zstd -xf /tmp/ll.tar.zst --strip-components=1 -C /home/runner/build/llvm 
+          tar --zstd -xf /tmp/tool.tar.zst --strip-components=2 -C /home/runner/build/tools --wildcards '*/toolchain-*'
+          rm -rf /tmp/*.tar.zst 
 
       - name: 克隆 OpenWrt 主线源码
         run: |
@@ -96,7 +95,7 @@ jobs:
           cp ${{ github.workspace }}/kconfig ${{ env.OPENWRT_DIR }}/target/linux/rockchip/armv8/config-6.18
           cp ${{ github.workspace }}/diffconfig ${{ env.OPENWRT_DIR }}/.config
           ./scripts/ext-toolchain.sh \
-            --toolchain /home/runner/build/tools/toolchain-*/ \
+            --toolchain /home/runner/build/tools/ \
             --overwrite-config \
             --config rockchip/armv8
           make defconfig
